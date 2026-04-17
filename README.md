@@ -1,6 +1,6 @@
-# 📋 README.md - Informe de Auditoría de Seguridad iAudit
+# 📋 Informe de Auditoría de Seguridad iAudit
 
-```markdown
+
 # Informe de Auditoría de Seguridad de Software
 ## Demo SaaS iAudit - Frontend Security Assessment
 
