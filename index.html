@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iSecure Audit - Análisis de Vulnerabilidades iOS</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .terminal-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #18181b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3f3f46; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b; 
+        }
+
+        .scan-line {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #22c55e, transparent);
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: scan 2s linear infinite;
+            display: none;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 h-screen overflow-hidden selection:bg-green-900 selection:text-green-100">
+
+    <div id="login-view" class="flex flex-col items-center justify-center h-full relative z-10 transition-opacity duration-500">
+        <div class="absolute inset-0 overflow-hidden -z-10">
+            <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-green-900/20 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-900/20 rounded-full blur-3xl"></div>
+        </div>
+
+        <div class="w-full max-w-md bg-zinc-900/80 backdrop-blur-md border border-zinc-800 rounded-2xl p-8 shadow-2xl">
+            <div class="flex flex-col items-center mb-8">
+                <div class="w-16 h-16 bg-zinc-800 rounded-xl flex items-center justify-center mb-4 border border-zinc-700">
+                    <i class="fa-brands fa-apple text-3xl text-white"></i>
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight">iSecure Audit</h1>
+                <p class="text-zinc-400 text-sm mt-1">Plataforma de Auditoría de Seguridad iOS</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1.5">Usuario</label>
+                    <input type="text" id="email" value="demo@iaudit.local" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1.5">Contraseña</label>
+                    <input type="password" id="password" value="demo1234" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-green-600 focus:ring-1 focus:ring-green-600 transition-colors">
+                </div>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-500 text-white font-medium py-2.5 rounded-lg transition-all duration-200 mt-2 shadow-lg shadow-green-900/20">
+                    Iniciar Sesión
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center">
+                <p class="text-xs text-zinc-500">Acceso a evaluación mediante checklist (Demo SaaS)</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-view" class="hidden h-full flex flex-col">
+        <header class="h-16 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur flex items-center justify-between px-6 z-20">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-shield-halved text-green-500 text-xl"></i>
+                <span class="font-bold text-lg tracking-tight">iSecure <span class="text-zinc-400 font-normal">Audit Pro</span></span>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 rounded-full border border-zinc-700">
+                    <span id="nav-score" class="text-xs font-bold text-green-400">Score: Pendiente</span>
+                </div>
+                <div id="btn-logout" class="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center border border-zinc-600 cursor-pointer hover:bg-red-500 hover:text-white transition">
+                    <i class="fa-solid fa-power-off text-xs"></i>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 flex overflow-hidden">
+            <aside class="w-64 border-r border-zinc-800 bg-zinc-900/30 hidden md:flex flex-col">
+                <nav class="flex-1 p-4 space-y-1">
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 bg-zinc-800/50 text-green-400 rounded-lg text-sm font-medium border border-zinc-700/50">
+                        <i class="fa-solid fa-list-check"></i> Checklist Activa
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-3 py-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 rounded-lg text-sm font-medium transition-colors">
+                        <i class="fa-solid fa-file-contract"></i> Reportes
+                    </a>
+                </nav>
+            </aside>
+
+            <div class="flex-1 p-6 overflow-y-auto">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 relative overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-br from-zinc-800/30 to-transparent opacity-50 -z-10"></div>
+                        <h2 class="text-lg font-semibold mb-2"><i class="fa-solid fa-sliders text-zinc-400 mr-2"></i> Configuración de Seguridad</h2>
+                        <p class="text-xs text-zinc-500 mb-6">Completa los datos del dispositivo para evaluar su postura de seguridad.</p>
+                        
+                        <form id="audit-form" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-zinc-400 uppercase mb-1">Modelo de iPhone</label>
+                                    <input id="f-model" type="text" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm focus:border-green-600 focus:outline-none" placeholder="Ej: iPhone 14 Pro">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-zinc-400 uppercase mb-1">Versión iOS</label>
+                                    <input id="f-ios" type="text" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm focus:border-green-600 focus:outline-none" placeholder="Ej: 17.4.1">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs text-zinc-400 uppercase mb-1">Tipo de Passcode</label>
+                                <select id="f-passcode" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm text-zinc-100 focus:border-green-600 focus:outline-none">
+                                    <option value="6digit">Alfanumérico / 6 o más dígitos (Recomendado)</option>
+                                    <option value="4digit">Código de 4 dígitos</option>
+                                    <option value="none">Ninguno (Riesgo Crítico)</option>
+                                </select>
+                            </div>
+
+                            <div class="border-t border-zinc-800/50 my-4"></div>
+
+                            <div class="space-y-3">
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <input type="checkbox" id="f-jailbroken" class="w-4 h-4 accent-green-600 bg-zinc-950 border-zinc-800">
+                                    <span class="text-sm text-zinc-300 group-hover:text-white transition">Jailbreak realizado/detectado</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <input type="checkbox" id="f-2fa" checked class="w-4 h-4 accent-green-600 bg-zinc-950 border-zinc-800">
+                                    <span class="text-sm text-zinc-300 group-hover:text-white transition">Autenticación de 2 Factores (2FA) en Apple ID</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <input type="checkbox" id="f-findmy" checked class="w-4 h-4 accent-green-600 bg-zinc-950 border-zinc-800">
+                                    <span class="text-sm text-zinc-300 group-hover:text-white transition">"Buscar mi iPhone" activado</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <input type="checkbox" id="f-usbrestricted" checked class="w-4 h-4 accent-green-600 bg-zinc-950 border-zinc-800">
+                                    <span class="text-sm text-zinc-300 group-hover:text-white transition">Accesorios USB Restringidos al bloquearse</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <input type="checkbox" id="f-unknownprofiles" class="w-4 h-4 accent-green-600 bg-zinc-950 border-zinc-800">
+                                    <span class="text-sm text-zinc-300 group-hover:text-white transition">Existen perfiles/MDM desconocidos instalados</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <input type="checkbox" id="f-sideloading" class="w-4 h-4 accent-green-600 bg-zinc-950 border-zinc-800">
+                                    <span class="text-sm text-zinc-300 group-hover:text-white transition">Sideloading o tiendas alternativas en uso</span>
+                                </label>
+                                <label class="flex items-center gap-3 cursor-pointer group">
+                                    <input type="checkbox" id="f-openwifi" class="w-4 h-4 accent-green-600 bg-zinc-950 border-zinc-800">
+                                    <span class="text-sm text-zinc-300 group-hover:text-white transition">Auto-conexión a redes Wi-Fi abiertas permitida</span>
+                                </label>
+                            </div>
+
+                            <button type="submit" class="w-full mt-6 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-microchip"></i> Procesar Evaluación
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl flex flex-col overflow-hidden">
+                        <div class="p-4 border-b border-zinc-800 bg-zinc-900/80 flex items-center justify-between">
+                            <h3 class="font-medium text-sm text-zinc-300"><i class="fa-solid fa-list-check mr-2"></i> Reporte de Postura</h3>
+                            <span class="px-2 py-1 bg-zinc-800 rounded text-xs text-zinc-400 terminal-font">OUTPUT</span>
+                        </div>
+                        <div id="results-container" class="p-6 flex-1 overflow-y-auto flex flex-col items-center justify-center text-center">
+                            <i class="fa-solid fa-shield-cat text-4xl text-zinc-700 mb-3"></i>
+                            <p class="text-zinc-500 text-sm">Esperando parámetros para calcular el puntaje de seguridad y mostrar hallazgos...</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="toasts" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2"></div>
+
+    <script src="js/api.js"></script>
+    <script>
+        const $ = (s) => document.querySelector(s);
+
+        // 1. AUTHENTICATION LOGIC (con API real)
+        $('#login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = $('#email').value;
+            const pwd = $('#password').value;
+
+            try {
+                await ISecureAPI.auth.login(email, pwd);
+
+                $('#login-view').classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    $('#login-view').classList.add('hidden');
+                    $('#dashboard-view').classList.remove('hidden');
+                    showToast('Inicio Exitoso', 'Sesión iniciada correctamente.', 'success');
+                }, 500);
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        });
+
+        // Check auth on load
+        if (ISecureAPI.auth.isAuthenticated()) {
+            $('#login-view').classList.add('hidden');
+            $('#dashboard-view').classList.remove('hidden');
+        }
+
+        $('#btn-logout').addEventListener('click', () => {
+            ISecureAPI.auth.logout();
+            $('#dashboard-view').classList.add('hidden');
+            $('#login-view').classList.remove('hidden', 'opacity-0', 'scale-95');
+
+            $('#results-container').innerHTML = `
+                <i class="fa-solid fa-shield-cat text-4xl text-zinc-700 mb-3"></i>
+                <p class="text-zinc-500 text-sm">Esperando parámetros para calcular el puntaje de seguridad y mostrar hallazgos...</p>
+            `;
+            $('#nav-score').textContent = 'Score: Pendiente';
+            $('#audit-form').reset();
+        });
+
+        // 2. TOAST SYSTEM
+        function showToast(title, message, type) {
+            const toastEl = document.createElement('div');
+            const icon = type === 'success' ? '<i class="fa-solid fa-circle-check text-green-500"></i>' 
+                       : type === 'error' ? '<i class="fa-solid fa-circle-xmark text-red-500"></i>' 
+                       : '<i class="fa-solid fa-triangle-exclamation text-yellow-500"></i>';
+                       
+            toastEl.className = `flex items-start gap-3 bg-zinc-800 border border-zinc-700 rounded-lg p-4 shadow-xl mb-2 transition-all duration-300 transform translate-y-4 opacity-0`;
+            toastEl.innerHTML = `
+                ${icon}
+                <div>
+                    <h4 class="text-sm font-semibold text-zinc-100">${title}</h4>
+                    <p class="text-xs text-zinc-400 mt-0.5">${message}</p>
+                </div>
+            `;
+            
+            $('#toasts').appendChild(toastEl);
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                toastEl.classList.remove('translate-y-4', 'opacity-0');
+            });
+            
+            // Auto remove
+            setTimeout(() => {
+                toastEl.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => toastEl.remove(), 300);
+            }, 4000);
+        }
+
+        // 3. ASSESSMENT LOGIC (Inherited from iphone.html)
+        function computeAssessment(form) {
+            const findings = [];
+            
+            const add = (id, severity, title, detail) => {
+                findings.push({ id, severity, title, detail });
+            };
+
+            // Validations
+            if (!form.model) add('info-model', 'info', 'Modelo no especificado', 'El análisis será genérico.');
+            if (form.jailbroken) add('jailbreak', 'critical', 'Indicador de jailbreak', 'El dispositivo tiene compromisos profundos a nivel de sistema base.');
+            
+            if (form.passcode === 'none') {
+                add('no-passcode', 'critical', 'Sin código de desbloqueo', 'Extracción de datos extremadamente sencilla con acceso físico.');
+            } else if (form.passcode === '4digit') {
+                add('weak-passcode', 'high', 'Passcode de 4 dígitos', 'Reduce el espacio de búsqueda. Vulnerable a ataques de fuerza bruta cortos.');
+            }
+
+            if (!form.twoFactor) add('no-2fa', 'high', '2FA Desactivado', 'Tu Apple ID es susceptible a suplantación y toma de control.');
+            if (!form.findMy) add('no-findmy', 'medium', 'Buscar mi iPhone inactivo', 'Sin capacidad para borrar el dispositivo remotamente si se pierde.');
+            if (!form.usbRestricted) add('usb-acc', 'high', 'Accesorios USB permitidos', 'Riesgo alto de ataques tipo GrayKey o Cellebrite.');
+            if (form.unknownProfiles) add('profiles', 'high', 'Perfiles / MDM Desconocidos', 'El tráfico de red o las aplicaciones pueden estar comprometidas/espiadas.');
+            if (form.sideloading) add('sideloading', 'medium', 'Sideloading Permitido', 'Las aplicaciones no pasan por las validaciones de seguridad de la App Store.');
+            if (form.openwifi) add('open-wifi', 'medium', 'Auto-unión a Wi-Fi Abierta', 'Expuesto a ataques de intermediario (Man-in-the-Middle).');
+
+            // Scoring calculation
+            const weights = { critical: 22, high: 14, medium: 8, low: 4, info: 1 };
+            let score = 100;
+            findings.forEach(f => score -= (weights[f.severity] || 0));
+            score = Math.max(0, Math.min(100, Math.round(score)));
+
+            return { score, findings };
+        }
+
+        // 4. FORM SUBMIT & RENDER RESULTS (con API real)
+        $('#audit-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Build object from inputs
+            const formData = {
+                model: $('#f-model').value.trim(),
+                ios: $('#f-ios').value.trim(),
+                passcode: $('#f-passcode').value,
+                jailbroken: $('#f-jailbroken').checked,
+                twoFactor: $('#f-2fa').checked,
+                findMy: $('#f-findmy').checked,
+                usbRestricted: $('#f-usbrestricted').checked,
+                unknownProfiles: $('#f-unknownprofiles').checked,
+                sideloading: $('#f-sideloading').checked,
+                openwifi: $('#f-openwifi').checked
+            };
+
+            try {
+                // Guardar auditoría en API
+                const auditData = {
+                    device_model: formData.model || 'iPhone',
+                    ios_version: formData.ios || 'Desconocida',
+                    passcode: formData.passcode,
+                    jailbroken: formData.jailbroken,
+                    twoFactorAuth: formData.twoFactor,
+                    findMyIphone: formData.findMy,
+                    usbRestricted: formData.usbRestricted,
+                    unknownProfiles: formData.unknownProfiles,
+                    sideloading: formData.sideloading,
+                    autoJoinWifi: formData.openwifi
+                };
+
+                const response = await ISecureAPI.isecure.createAudit(auditData);
+                const result = response.audit;
+
+                // Render Score Top bar
+                $('#nav-score').textContent = `Score: ${result.score}/100`;
+
+                // Render View
+                let renderHTML = `
+                    <div class="w-full flex flex-col items-center mb-6">
+                        <div class="text-xs text-zinc-400 uppercase tracking-wider mb-2">Puntaje Global</div>
+                        <div class="text-5xl font-bold terminal-font ${
+                            result.score >= 80 ? 'text-green-500' :
+                            result.score >= 50 ? 'text-yellow-500' : 'text-red-500'
+                        }">${result.score}</div>
+                        <div class="text-xs mt-2 ${result.risk_level === 'high' ? 'text-green-400' : result.risk_level === 'medium' ? 'text-yellow-400' : 'text-red-400'}">${result.passed_checks}/${result.total_checks} checks pasados</div>
+                    </div>
+                    <div class="w-full space-y-3">
+                `;
+
+                if (result.findings.length === 0) {
+                    renderHTML += `
+                        <div class="p-4 bg-green-900/20 border border-green-800 rounded-lg flex items-start gap-3">
+                            <i class="fa-solid fa-shield-check text-green-500 mt-1"></i>
+                            <div>
+                                <h4 class="text-sm font-semibold text-green-400">Postura Excelente</h4>
+                                <p class="text-xs text-green-500/80 mt-1">No se han detectado riesgos de configuración significativos en el dispositivo.</p>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    result.findings.forEach(f => {
+                        const styles = {
+                            critical: 'bg-red-950/40 border-red-900 text-red-400',
+                            high: 'bg-orange-950/40 border-orange-900 text-orange-400',
+                            medium: 'bg-yellow-950/40 border-yellow-900 text-yellow-400',
+                            low: 'bg-zinc-800/40 border-zinc-700 text-zinc-400'
+                        };
+                        const st = styles[f.severity] || styles.low;
+                        const iconColor = f.severity === 'critical' ? 'text-red-500' : f.severity === 'high' ? 'text-orange-500' : f.severity === 'medium' ? 'text-yellow-500' : 'text-zinc-500';
+
+                        renderHTML += `
+                            <div class="p-3 border rounded-lg flex items-start gap-3 text-left ${st}">
+                                <i class="fa-solid fa-triangle-exclamation mt-1 text-sm ${iconColor}"></i>
+                                <div>
+                                    <h4 class="text-sm font-bold">${f.description}</h4>
+                                    <p class="text-xs opacity-80 mt-1">Severidad: ${f.severity} | Impacto: ${f.points} pts</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                renderHTML += `</div>`;
+                $('#results-container').innerHTML = renderHTML;
+                $('#results-container').classList.remove('items-center', 'justify-center');
+
+                // Guardar ID de auditoría actual
+                window.currentAuditId = result.id;
+
+                showToast('Análisis Completado', 'Auditoría guardada exitosamente.', 'success');
+            } catch (error) {
+                showToast('Error', error.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
