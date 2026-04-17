@@ -74,6 +74,8 @@ $('#results-container').innerHTML = renderHTML;
 // En showToast
 toastEl.innerHTML = `<p class="...">${message}</p>`;
 ```
+<img width="706" height="740" alt="Captura de pantalla 2026-04-17 164828" src="https://github.com/user-attachments/assets/6aadc827-17bc-4b43-bd35-15b932bd5210" />
+
 
 #### Impacto
 - Ejecución de scripts maliciosos en el navegador del auditor
